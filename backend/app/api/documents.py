@@ -8,6 +8,7 @@ from app.core.oauth2 import get_current_user
 from app.models.user import User
 
 router = APIRouter()
+MAX_FILE_SIZE = 10 * 1024 * 1024
 
 @router.post("/documents")
 def upload_document(file:UploadFile=File(...),db: Session = Depends(get_db),current_user:User=Depends(get_current_user)):
@@ -17,7 +18,23 @@ def upload_document(file:UploadFile=File(...),db: Session = Depends(get_db),curr
     file_content = file.file.read()
     content_type = file.content_type
     file_size = len(file_content)
+
     
+    if file_size==0:
+        raise HTTPException(
+            status_code=400,
+            detail="File cannot be empty"
+        )
+    if content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed"
+        )
+    if file_size>MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="File size exceeds limit"
+        )
     with open(file_path,"wb") as buffer:
         buffer.write(file_content)
 
