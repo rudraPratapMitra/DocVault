@@ -6,7 +6,11 @@ from app.core.dependencies import get_db
 from app.schemas.document import DocumentResponse
 from app.core.oauth2 import get_current_user
 from app.models.user import User
-
+from app.core.chunker import chunk_text
+from app.core.pdf import extract_text_from_pdf
+from app.core.vector_store import create_collection, index_document
+from app.schemas.query import QueryRequest
+from app.core.vector_store import search_chunks
 router = APIRouter()
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -49,10 +53,20 @@ def upload_document(file:UploadFile=File(...),db: Session = Depends(get_db),curr
     db.add(document)
     db.commit()
     db.refresh(document)
+
+    create_collection()
+    text = extract_text_from_pdf(file_path)
+    chunks = chunk_text(text)
+    indexed_chunks = index_document(
+        document_id=document.id,
+        owner_id=current_user.id,
+        chunks=chunks,
+    )
     return{
         "id":document.id,
         "filename":document.filename,
-        "status":document.status
+        "status":document.status,
+        "chunks_indexed": indexed_chunks
     }
 @router.get("/documents")
 def get_my_documnets(db:Session=Depends(get_db),current_user:User=Depends(get_current_user)):
@@ -91,4 +105,16 @@ def delete_document(document_id:int,db:Session=Depends(get_db),current_user:User
     db.commit()
     return {
         "message":f"Document {document_id} deleted"
+    }
+
+@router.post("/documents/{document_id}/query")
+def query_document(document_id:int,request:QueryRequest,current_user:User=Depends(get_current_user)):
+    chunks=search_chunks(
+        query=request.question,
+        owner_id=current_user.id,
+        document_id=document_id
+
+    )
+    return {
+        "chunks":chunks
     }

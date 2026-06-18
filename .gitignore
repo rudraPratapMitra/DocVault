@@ -17,4 +17,7 @@ __pycache__/
 Thumbs.db
 
 #uploads
-backend/uploads/
+backend/uploads/\
+
+#Qdrant
+backend/qdrant_data/
