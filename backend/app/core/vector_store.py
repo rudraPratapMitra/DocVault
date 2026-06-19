@@ -54,7 +54,7 @@ def search_chunks(query:str, owner_id: int,document_id: int):
             )
         ]
         ),
-        limit=3
+        limit=10
         )
     chunks = []
     for point in results.points:

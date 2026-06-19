@@ -9,8 +9,9 @@ from app.models.user import User
 from app.core.chunker import chunk_text
 from app.core.pdf import extract_text_from_pdf
 from app.core.vector_store import create_collection, index_document
-from app.schemas.query import QueryRequest
+from app.schemas.query import QueryRequest, QueryResponse
 from app.core.vector_store import search_chunks
+from app.core.llm import generate_answer
 router = APIRouter()
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -107,14 +108,28 @@ def delete_document(document_id:int,db:Session=Depends(get_db),current_user:User
         "message":f"Document {document_id} deleted"
     }
 
-@router.post("/documents/{document_id}/query")
-def query_document(document_id:int,request:QueryRequest,current_user:User=Depends(get_current_user)):
+@router.post("/documents/{document_id}/query",response_model=QueryResponse)
+def query_document(document_id:int,request:QueryRequest,db: Session = Depends(get_db),current_user:User=Depends(get_current_user)):
+    document=db.query(Document).filter(Document.id==document_id).first()
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+    if document.owner_id!=current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized"
+        )
     chunks=search_chunks(
         query=request.question,
         owner_id=current_user.id,
         document_id=document_id
-
+        )
+    answer = generate_answer(
+        question=request.question,
+        chunks=chunks
+    )   
+    return QueryResponse(
+        answer=answer
     )
-    return {
-        "chunks":chunks
-    }
